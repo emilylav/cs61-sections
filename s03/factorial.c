@@ -15,7 +15,10 @@ int factorial(int n) {
     // arithmetic on `buf` to find the location of the return address.
     // NB: Undefined behavior is OK for this section.
     char buf[BUFSIZ];
-    sprintf(buf, "Calling %d!, return address ???", n);
+    void* retaddr;
+    // NB: The `24` constant depends on compiler version!
+    memcpy(&retaddr, &buf[BUFSIZ + 24], sizeof(void*));
+    sprintf(buf, "Calling %d!, return address %p", n, retaddr);
     puts(buf);
 
     int x;
@@ -31,6 +34,13 @@ int factorial(int n) {
     // prints `HIJACKED! 24` instead of `5! == 120`.
     // You may want to use gdb and `objdump -S factorial`, as well
     // as trial and error.
+
+    if (n == 4) {
+        retaddr = hijacker;
+        retaddr = memchr(hijacker, 0xe8, 100);
+        retaddr = (const char*) retaddr + 5;
+        memcpy(&buf[BUFSIZ + 24], &retaddr, sizeof(retaddr));
+    }
 
     return x;
 }
