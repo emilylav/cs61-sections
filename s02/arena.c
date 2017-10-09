@@ -3,10 +3,13 @@
 #include <assert.h>
 
 
+union chunk_space;
+
 // A `free_chunk` was allocated by the arena, but isn't currently in
 // use. You'll likely put some bookkeeping information into such chunks.
 typedef struct free_space {
     // YOUR CODE HERE
+    union chunk_space* next;
 } free_space;
 
 // An `allocation` object is *either* a chunk (an active allocation),
@@ -27,14 +30,17 @@ typedef struct arena_group {
 } arena_group;
 
 // A `membench_arena` is a singly-linked list of groups.
+// Also starting a singly-linked free list
 struct membench_arena {
     arena_group* groups;
+    chunk_space* free;
 };
 
-
+// update free list and groups list
 membench_arena* membench_arena_create(void) {
     membench_arena* arena = (membench_arena*) malloc(sizeof(membench_arena));
     arena->groups = NULL;
+    arena->free = NULL;
     return arena;
 }
 
@@ -62,14 +68,21 @@ static arena_group* group_create(membench_arena* arena) {
 
 
 chunk* membench_alloc(membench_arena* arena) {
-    // Find a group that has free space.
+
+    if (arena->free) { // there is a free node in list; remove it
+        chunk* result = &arena->free->active;
+        arena->free = arena->free->free.next;
+        return result;
+    }
+    
     arena_group* g = arena->groups;
+    // follow list
     while (g && g->nused < NSPACES) {
         g = g->next;
     }
-
-    // If we there's no such group, allocate a new one.
-    if (!g) {
+    
+    
+    if (!g) { // create a new group if needed
         g = group_create(arena);
         assert(g && g->nused < NSPACES);
     }
@@ -79,9 +92,12 @@ chunk* membench_alloc(membench_arena* arena) {
     return result;
 }
 
-
 void membench_free(membench_arena* arena, chunk* x) {
-    (void) arena, (void) x;
+    //(void) arena, (void) x;
+    // keep track of frees in free list
+    chunk_space* new_space = (chunk_space*) x;
+    new_space->free.next = arena->free;
+    arena->free = new_space;
 }
 
 
